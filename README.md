@@ -8,14 +8,14 @@ It provides single decorator, adding a timeout for the function call.
 
 Example of the usage:
 
-    import thread\_timeout
+    import thread_timeout
 
-    @thread\_timeout(10, kill=False)
-    def NFS\_read(path):
+    @thread_timeout(10, kill=False)
+    def NFS_read(path):
         file(path, 'r').read()
 
     try:
-        print("Result: %s" % NFS\_read('/broken\_nfs/file'))
+        print("Result: %s" % NFS_read('broken_nfs/file'))
     except ExecTimeoutException:
         print ("NFS seems to be hung")
 
