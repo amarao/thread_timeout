@@ -7,6 +7,7 @@ It provides single decorator, adding a timeout for the function call.
 
 
 Example of the usage:
+
     import thread\_timeout
 
     @thread\_timeout(10, kill=False)
