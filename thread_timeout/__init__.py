@@ -81,7 +81,7 @@ def _kill_thread(t):
     res = ctypes.pythonapi.PyThreadState_SetAsyncExc(ct, exc)
     if res == 0:
         raise ValueError("nonexistent thread id")
-    elif res != 1 : # Returns the number of thread states modified
+    elif res != 1:  # Returns the number of thread states modified
         ctypes.pythonapi.PyThreadState_SetAsyncExc(t.ident, None)
         raise SystemError("PyThreadState_SetAsyncExc failed")
 
@@ -120,7 +120,7 @@ def thread_timeout(delay, kill=True, kill_wait=0.1):
                     "Timeout and no kill attempt")
             _kill_thread(thread)
             time.sleep(kill_wait)
-            ## FIXME isAlive is giving fals positive results
+            # FIXME isAlive is giving fals positive results
             if thread.isAlive():
                 raise FailedKillExecTimeoutException(
                     "Timeout, thread refuses to die in %s seconds" %
@@ -176,7 +176,8 @@ def test3():
 
 def test4():
     ''' FailedKillExecTimeoutException
-    FIXME! This is a wired test.  thread_timeout should actually stop this function 
+        FIXME! This is a wired test.  thread_timeout
+        should actually stop this function
     '''
     @thread_timeout(1)
     def looong(x):
@@ -204,7 +205,7 @@ def test5():
 
 
 def test6():
-    ''' decorator is not changing python's into inspection    
+    ''' decorator is not changing python's into inspection
     '''
     from inspect import getargspec
 
@@ -214,23 +215,24 @@ def test6():
     func_with_timeout = thread_timeout(1)(func)
     assert getargspec(func) == getargspec(func_with_timeout)
 
+
 def test6():
-    ''' Class methods    
+    ''' Class methods
     '''
     class Class(object):
 
-        @thread_timeout(1) 
+        @thread_timeout(1)
         def short(self, x):
             return x
 
-        @thread_timeout(1) 
+        @thread_timeout(1)
         def looong(self, x):
             time.sleep(1000)
             return x
 
     obj = Class()
     res = obj.short("OK")
-    assert res == 'OK'  
+    assert res == 'OK'
     try:
         res = obj.looong('KO')
     except KilledExecTimeoutException:
