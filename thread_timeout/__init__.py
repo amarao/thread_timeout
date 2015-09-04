@@ -14,12 +14,13 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
-
+from __future__ import print_function
 import threading
 import time
 import signal
 import ctypes
-
+import wrapt  # pip install wrapt
+from Queue import Queue
 '''
     thread_timeout allows to run piece of the python code safely regardless
     of TASK_UNINTERRUPTIBLE issues.
@@ -80,8 +81,9 @@ def _kill_thread(t):
     res = ctypes.pythonapi.PyThreadState_SetAsyncExc(ct, exc)
     if res == 0:
         raise ValueError("nonexistent thread id")
-    else:
+    elif res != 1 : # Returns the number of thread states modified
         ctypes.pythonapi.PyThreadState_SetAsyncExc(t.ident, None)
+        raise SystemError("PyThreadState_SetAsyncExc failed")
 
 
 class ExecTimeoutException(BaseException):
@@ -101,84 +103,145 @@ class NotKillExecTimeoutException(ExecTimeoutException):
 
 
 def thread_timeout(delay, kill=True, kill_wait=0.1):
-    def generate_decorator(function):
+    @wrapt.decorator
+    def wrapper(wrapped, instance, args, kwargs):
+        queue = Queue()
 
-        def decorator(*args, **kwargs):
-            result = [None]
-
-            def inner_worker():
-                result[0] = function(*args, **kwargs)
-            thread = threading.Thread(target=inner_worker)
-            thread.daemon = True
-            thread.start()
-            thread.join(delay)
+        def inner_worker():
+            result = wrapped(*args, **kwargs)
+            queue.put(result)
+        thread = threading.Thread(target=inner_worker)
+        thread.daemon = True
+        thread.start()
+        thread.join(delay)
+        if thread.isAlive():
+            if not kill:
+                raise NotKillExecTimeoutException(
+                    "Timeout and no kill attempt")
+            _kill_thread(thread)
+            time.sleep(kill_wait)
+            ## FIXME isAlive is giving fals positive results
             if thread.isAlive():
-                    if not kill:
-                        raise NotKillExecTimeoutException(
-                            "Timeout and no kill attempt")
-                    _kill_thread(thread)
-                    time.sleep(kill_wait)
-                    if thread.isAlive():
-                        raise FailedKillExecTimeoutException(
-                            "Timeout, thread refuses to die in %s seconds" %
-                            kill_wait)
-                    else:
-                        raise KilledExecTimeoutException(
-                            "Timeout and thread was killed")
-            return result[0]
-        return decorator
-    return generate_decorator
+                raise FailedKillExecTimeoutException(
+                    "Timeout, thread refuses to die in %s seconds" %
+                    kill_wait)
+            else:
+                raise KilledExecTimeoutException(
+                    "Timeout and thread was killed")
+        return queue.get()
+    return wrapper
 
-if __name__ == "__main__":
-    print ("Running tests")
 
+def test1():
+    ''' timeout is not stopping quick function
+    '''
     @thread_timeout(2)
-    def test1(delay):
-        print ("  .. sleeing for %s" % delay)
+    def func(delay):
+        print("  .. sleeing for %s" % delay)
         time.sleep(delay)
-        print ("  .. done sleep for %s" % delay)
+        print("  .. done sleep for %s" % delay)
     try:
-        res = test1(1)
-        print ("Test1 OK")
+        res = func(1)
+        print("Test1 OK")
     except ExecTimeoutException:
-        print ("Test1 failed, timeout too soon")
+        print("Test1 failed, timeout too soon")
 
+
+def test2():
+    ''' timeout is stopping long function
+    '''
     @thread_timeout(1)
-    def test2(delay):
-        print ("  .. sleeing for %s" % delay)
+    def func(delay):
+        print("  .. sleeing for %s" % delay)
         time.sleep(delay)
         print("  .. done sleep for %s" % delay)
 
     try:
-        test2(3)
+        func(3)
         raise Exception("Test2 failed: timeout does not work")
     except ExecTimeoutException as e:
-        print ("  .. got excepted execption %s" % repr(e))
+        print("  .. got excepted execption %s" % repr(e))
         print("Test2 OK")
 
+
+def test3():
+    ''' function returns result
+    '''
     @thread_timeout(1)
-    def test3(x):
+    def func(x):
         return x
 
-    if test3('OK') != 'OK':
-        print ("Test3 failed, %s", repr(test3('OK')))
-    else:
-        print ("Test3 OK")
+    assert func('OK') == 'OK'
 
+
+def test4():
+    ''' FailedKillExecTimeoutException
+    FIXME! This is a wired test.  thread_timeout should actually stop this function 
+    '''
     @thread_timeout(1)
-    def test4(x):
+    def looong(x):
         for a in range(0, x):
             time.sleep(2)
     try:
-        test4(2)
+        looong(20)
+        raise Exception('FailedKillExecTimeoutException was expected')
     except FailedKillExecTimeoutException as e:
-        print ("Test4 OK, got expected exception %s" % repr(e))
+        print("Test4 OK, got expected exception %s" % repr(e))
 
+
+def test5():
+    ''' NotKillExecTimeoutException
+    '''
     @thread_timeout(1, kill=False)
-    def test5(x):
+    def looong_and_unkillable(x):
         for a in range(0, x):
             time.sleep(2)
     try:
-        test5(2)
+        looong_and_unkillable(2)
+        raise Exception('NotKillExecTimeoutException was expected')
     except NotKillExecTimeoutException as e:
-        print ("Test5 OK, got expected exception %s" % repr(e))
+        print("Test5 OK, got expected exception %s" % repr(e))
+
+
+def test6():
+    ''' decorator is not changing python's into inspection    
+    '''
+    from inspect import getargspec
+
+    def func(x, y=1, *args, **kwargs):
+        return vars()
+
+    func_with_timeout = thread_timeout(1)(func)
+    assert getargspec(func) == getargspec(func_with_timeout)
+
+def test6():
+    ''' Class methods    
+    '''
+    class Class(object):
+
+        @thread_timeout(1) 
+        def short(self, x):
+            return x
+
+        @thread_timeout(1) 
+        def looong(self, x):
+            time.sleep(1000)
+            return x
+
+    obj = Class()
+    res = obj.short("OK")
+    assert res == 'OK'  
+    try:
+        res = obj.looong('KO')
+    except KilledExecTimeoutException:
+        pass
+
+
+if __name__ == "__main__":
+    print("Running tests")
+
+    from nose import run
+    run(argv=[
+        '', __file__,
+        '-v'
+    ])
