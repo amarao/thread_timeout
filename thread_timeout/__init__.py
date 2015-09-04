@@ -121,12 +121,12 @@ def thread_timeout(delay, kill=True, kill_wait=0.1):
             _kill_thread(thread)
             time.sleep(kill_wait)
             ## FIXME isAlive is giving fals positive results
-            # if thread.isAlive():
-            #     raise FailedKillExecTimeoutException(
-            #         "Timeout, thread refuses to die in %s seconds" %
-            #         kill_wait)
-            # else:
-            raise KilledExecTimeoutException(
+            if thread.isAlive():
+                raise FailedKillExecTimeoutException(
+                    "Timeout, thread refuses to die in %s seconds" %
+                    kill_wait)
+            else:
+                raise KilledExecTimeoutException(
                     "Timeout and thread was killed")
         return queue.get()
     return wrapper
@@ -183,7 +183,7 @@ def test4():
         for a in range(0, x):
             time.sleep(2)
     try:
-        looong(20000)
+        looong(20)
         raise Exception('FailedKillExecTimeoutException was expected')
     except FailedKillExecTimeoutException as e:
         print("Test4 OK, got expected exception %s" % repr(e))
