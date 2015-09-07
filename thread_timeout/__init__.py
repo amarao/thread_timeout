@@ -39,7 +39,7 @@ from Queue import Queue
 
         try:
             print("Result: %s" % NFS_read('/broken_nfs/file'))
-        except ExecTimeoutException:
+        except ExecTimeout:
             print ("NFS seems to be hung")
 
 
@@ -63,13 +63,13 @@ from Queue import Queue
 
     Exceptions:
 
-    ExecTimeoutException - function did not finish on time, timeout
+    ExecTimeout - function did not finish on time, timeout
         (base class for all following exceptions)
-    KilledExecTimeoutException - there was a timeout and thread
+    KilledExecTimeout - there was a timeout and thread
         with function was killed successfully
-    FailedKillExecTimeoutException - there was a timeout and kill attempt
+    FailedKillExecTimeout - there was a timeout and kill attempt
         but the thread refuses to die
-    NotKillExecTimeoutException - there was a timeout and there
+    NotKillExecTimeout - there was a timeout and there
         was no attempt to kill thread
 '''
 
@@ -89,19 +89,19 @@ def _kill_thread(thread):
     res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tr, SE)
 
 
-class ExecTimeoutException(BaseException):
+class ExecTimeout(BaseException):
     pass
 
 
-class KilledExecTimeoutException(ExecTimeoutException):
+class KilledExecTimeout(ExecTimeout):
     pass
 
 
-class FailedKillExecTimeoutException(ExecTimeoutException):
+class FailedKillExecTimeout(ExecTimeout):
     pass
 
 
-class NotKillExecTimeoutException(ExecTimeoutException):
+class NotKillExecTimeout(ExecTimeout):
     pass
 
 
@@ -119,17 +119,17 @@ def thread_timeout(delay, kill=True, kill_wait=0.04):
         thread.join(delay)
         if thread.isAlive():
             if not kill:
-                raise NotKillExecTimeoutException(
+                raise NotKillExecTimeout(
                     "Timeout and no kill attempt")
             _kill_thread(thread)
             time.sleep(kill_wait)
             # FIXME isAlive is giving fals positive results
             if thread.isAlive():
-                raise FailedKillExecTimeoutException(
+                raise FailedKillExecTimeout(
                     "Timeout, thread refuses to die in %s seconds" %
                     kill_wait)
             else:
-                raise KilledExecTimeoutException(
+                raise KilledExecTimeout(
                     "Timeout and thread was killed")
         return queue.get()
     return wrapper
@@ -146,7 +146,7 @@ def test1():
     try:
         res = func(1)
         print("Test1 OK")
-    except ExecTimeoutException:
+    except ExecTimeout:
         print("Test1 failed, timeout too soon")
 
 
@@ -162,7 +162,7 @@ def test2():
     try:
         func(3)
         raise Exception("Test2 failed: timeout does not work")
-    except ExecTimeoutException as e:
+    except ExecTimeout as e:
         print("  .. got excepted execption %s" % repr(e))
         print("Test2 OK")
 
@@ -178,7 +178,7 @@ def test3():
 
 
 def test4():
-    ''' FailedKillExecTimeoutException
+    ''' FailedKillExecTimeout
         FIXME! This is a wired test.  thread_timeout
         should actually stop this function
     '''
@@ -188,13 +188,13 @@ def test4():
             time.sleep(2)
     try:
         looong(20)
-        raise Exception('FailedKillExecTimeoutException was expected')
-    except FailedKillExecTimeoutException as e:
+        raise Exception('FailedKillExecTimeout was expected')
+    except FailedKillExecTimeout as e:
         print("Test4 OK, got expected exception %s" % repr(e))
 
 
 def test5():
-    ''' NotKillExecTimeoutException
+    ''' NotKillExecTimeout
     '''
     @thread_timeout(1, kill=False)
     def looong_and_unkillable(x):
@@ -202,8 +202,8 @@ def test5():
             time.sleep(2)
     try:
         looong_and_unkillable(2)
-        raise Exception('NotKillExecTimeoutException was expected')
-    except NotKillExecTimeoutException as e:
+        raise Exception('NotKillExecTimeout was expected')
+    except NotKillExecTimeout as e:
         print("Test5 OK, got expected exception %s" % repr(e))
 
 
@@ -239,7 +239,7 @@ def test6():
     assert res == 'OK'
     try:
         res = obj.looong('KO')
-    except KilledExecTimeoutException:
+    except KilledExecTimeout:
         pass
 
 
