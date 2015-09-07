@@ -22,10 +22,12 @@ import ctypes
 import wrapt  # pip install wrapt
 from Queue import Queue
 '''
-    thread_timeout allows to run piece of the python code safely regardless
-    of TASK_UNINTERRUPTIBLE issues.
+    thread_timeout decorator allows to run piece of the python code
+    safely regardless of TASK_UNINTERRUPTIBLE issues ('D' state).
 
-    It provides single decorator, adding a timeout for the function call.
+    Main sources of 'D' state are broken NFS, bad disk/IO, or kernel bugs.
+
+    Library provides single decorator, adding a timeout for the function call.
 
 
     Example of the usage:
@@ -72,18 +74,19 @@ from Queue import Queue
 '''
 
 
-def _kill_thread(t):
+def _kill_thread(thread):
     # heavily based on http://stackoverflow.com/a/15274929/2281274
     # by Johan Dahlin
     # rewrited to avoid licence uncertainty
-    exc = ctypes.py_object(SystemExit)
-    ct = ctypes.c_long(t.ident)
-    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(ct, exc)
-    if res == 0:
-        raise ValueError("nonexistent thread id")
-    elif res != 1:  # Returns the number of thread states modified
-        ctypes.pythonapi.PyThreadState_SetAsyncExc(t.ident, None)
-        raise SystemError("PyThreadState_SetAsyncExc failed")
+
+    # due to the strangeness in python 2.x, thread killing happens
+    # within 32 python operations regardless of duration
+    # (f.e. 32 x sleep(1), or 32 x sleep (0.01))
+    # python3 works fine
+    import sys
+    SE = ctypes.py_object(SystemExit)
+    tr = ctypes.c_long(thread.ident)
+    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tr, SE)
 
 
 class ExecTimeoutException(BaseException):
@@ -102,7 +105,7 @@ class NotKillExecTimeoutException(ExecTimeoutException):
     pass
 
 
-def thread_timeout(delay, kill=True, kill_wait=0.1):
+def thread_timeout(delay, kill=True, kill_wait=0.04):
     @wrapt.decorator
     def wrapper(wrapped, instance, args, kwargs):
         queue = Queue()
@@ -225,9 +228,10 @@ def test6():
         def short(self, x):
             return x
 
-        @thread_timeout(1)
+        @thread_timeout(1, kill_wait=0.33)
         def looong(self, x):
-            time.sleep(1000)
+            for x in range(0, 100):
+                time.sleep(0.01)
             return x
 
     obj = Class()
