@@ -219,7 +219,7 @@ def test6():
     assert getargspec(func) == getargspec(func_with_timeout)
 
 
-def test6():
+def test7():
     ''' Class methods
     '''
     class Class(object):
@@ -241,7 +241,6 @@ def test6():
         res = obj.looong('KO')
     except KilledExecTimeout:
         pass
-
 
 if __name__ == "__main__":
     print("Running tests")
