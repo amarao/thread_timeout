@@ -9,7 +9,8 @@ if __name__ == '__main__':
           author='George Shuklin',
           author_email='george.shuklin@gmail.com',
           url='https://github.com/amarao/thread_timeout',
-          packages=['Queue','wrapt','ctypes'],
+          packages=find_packages(),
+          install_requires=['Queue', 'wrapt', 'ctypes'],
           license='LGPL',
           classifiers=[
                        "Development Status :: 4 - Beta",
