@@ -139,7 +139,7 @@ def thread_timeout(delay, kill=True, kill_wait=0.04):
         if res[0] == 'success':
             return res[1]
         if res[0] == 'exception':
-            raise res[1]
+            raise res[1][0], res[1][1], res[1][2]
     return wrapper
 
 
