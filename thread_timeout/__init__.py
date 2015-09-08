@@ -18,9 +18,8 @@ from __future__ import print_function
 import threading
 import time
 import sys
-import signal
 import ctypes
-import wrapt  # pip install wrapt
+import wrapt  # pip install wrapt, apt-get install python-wrapt
 from Queue import Queue
 '''
     thread_timeout decorator allows to run piece of the python code
