@@ -17,6 +17,7 @@
 from __future__ import print_function
 import threading
 import time
+import sys
 import signal
 import ctypes
 import wrapt  # pip install wrapt
@@ -111,8 +112,12 @@ def thread_timeout(delay, kill=True, kill_wait=0.04):
         queue = Queue()
 
         def inner_worker():
-            result = wrapped(*args, **kwargs)
-            queue.put(result)
+            try:
+                result = wrapped(*args, **kwargs)
+                queue.put(('success',result))
+            except:
+                e = sys.exc_info()
+                queue.put(('exception',e))
         thread = threading.Thread(target=inner_worker)
         thread.daemon = True
         thread.start()
@@ -131,7 +136,11 @@ def thread_timeout(delay, kill=True, kill_wait=0.04):
             else:
                 raise KilledExecTimeout(
                     "Timeout and thread was killed")
-        return queue.get()
+        res = queue.get()
+        if res[0] == 'success':
+            return res[1]
+        if res[0] == 'exception':
+            raise res[1]
     return wrapper
 
 
@@ -140,32 +149,22 @@ def test1():
     '''
     @thread_timeout(2)
     def func(delay):
-        print("  .. sleeing for %s" % delay)
         time.sleep(delay)
-        print("  .. done sleep for %s" % delay)
-    try:
-        res = func(1)
-        print("Test1 OK")
-    except ExecTimeout:
-        print("Test1 failed, timeout too soon")
 
+    func(1)
 
 def test2():
-    ''' timeout is stopping long function
+    ''' ExecTimeout
     '''
     @thread_timeout(1)
     def func(delay):
-        print("  .. sleeing for %s" % delay)
         time.sleep(delay)
-        print("  .. done sleep for %s" % delay)
 
     try:
         func(3)
         raise Exception("Test2 failed: timeout does not work")
     except ExecTimeout as e:
-        print("  .. got excepted execption %s" % repr(e))
-        print("Test2 OK")
-
+        pass
 
 def test3():
     ''' function returns result
@@ -179,35 +178,45 @@ def test3():
 
 def test4():
     ''' FailedKillExecTimeout
-        FIXME! This is a wired test.  thread_timeout
-        should actually stop this function
     '''
     @thread_timeout(1)
-    def looong(x):
-        for a in range(0, x):
-            time.sleep(2)
+    def looong():
+        time.sleep(3)
     try:
-        looong(20)
+        looong()
         raise Exception('FailedKillExecTimeout was expected')
-    except FailedKillExecTimeout as e:
-        print("Test4 OK, got expected exception %s" % repr(e))
+    except FailedKillExecTimeout:
+        pass
 
 
 def test5():
     ''' NotKillExecTimeout
     '''
     @thread_timeout(1, kill=False)
-    def looong_and_unkillable(x):
-        for a in range(0, x):
+    def looong_and_unkillable():
             time.sleep(2)
     try:
-        looong_and_unkillable(2)
+        looong_and_unkillable()
         raise Exception('NotKillExecTimeout was expected')
     except NotKillExecTimeout as e:
         print("Test5 OK, got expected exception %s" % repr(e))
 
-
 def test6():
+    '''KilledExecTimeout
+    '''
+    @thread_timeout(1, kill_wait=0.40)
+    def killme():
+        for a in range(0,200):
+            time.sleep(0.01)
+        raise Exception("Not killed!")
+
+    try:
+        killme()
+    except KilledExecTimeout:
+        pass
+
+
+def test7():
     ''' decorator is not changing python's into inspection
     '''
     from inspect import getargspec
@@ -219,7 +228,7 @@ def test6():
     assert getargspec(func) == getargspec(func_with_timeout)
 
 
-def test7():
+def test8():
     ''' Class methods
     '''
     class Class(object):
@@ -230,7 +239,7 @@ def test7():
 
         @thread_timeout(1, kill_wait=0.33)
         def looong(self, x):
-            for x in range(0, 100):
+            for x in range(0, 300):
                 time.sleep(0.01)
             return x
 
@@ -241,6 +250,103 @@ def test7():
         res = obj.looong('KO')
     except KilledExecTimeout:
         pass
+
+
+def test9():
+    '''Check if exceptions are carried properly
+    '''
+    @thread_timeout(1, kill=False)
+    def exception(e):
+        raise e
+
+    exception_list = (
+                        OverflowError,
+                        ReferenceError,
+                        SyntaxError,
+                        ZeroDivisionError,
+                        FloatingPointError,
+                        BufferError,
+                        LookupError,
+                        AssertionError,
+                        AttributeError,
+                        TypeError,
+                        EOFError,
+                        IOError,
+                        ImportError,
+                        IndexError,
+                        KeyError,
+                        KeyboardInterrupt,
+                        MemoryError,
+                        NameError,
+                        NotImplementedError,
+                        OSError,
+                        UnboundLocalError,
+                        UnicodeError,
+                        ValueError,
+                        ExecTimeout
+                    )
+    for exc in exception_list:
+        try:
+            exception(exc)
+        except exc as e:
+            pass
+
+def test10():
+    '''Check if decorator stacking works (inner first)
+    '''
+    @thread_timeout(2)
+    def outer():
+        @thread_timeout(1)
+        def inner():
+            for x in range(0, 500):
+                time.sleep(0.01)
+        inner()
+            
+
+    begin = time.time()
+    try:
+        outer()
+    except ExecTimeout as e:
+        pass
+    assert 1 < time.time() - begin < 2
+
+
+def test11():
+    '''Check if decorator stacking works (outer first)
+    '''
+    @thread_timeout(1)
+    def outer():
+        @thread_timeout(2)
+        def inner():
+            for x in range(0,500):
+                time.sleep(0.01)
+        inner()
+
+    begin = time.time()
+    try:
+        outer()
+    except ExecTimeout:
+        pass
+    assert 1 < time.time() - begin < 2
+
+def test12():
+    '''Check if decorator waits before kill
+    '''
+    @thread_timeout(3)
+    def outer():
+        @thread_timeout(3)
+        def inner():
+            for x in range(0,100):
+                time.sleep(0.01)
+        inner()
+
+    begin = time.time()
+    outer()
+    assert 1 < time.time() - begin < 3
+
+    
+    
+
 
 if __name__ == "__main__":
     print("Running tests")
