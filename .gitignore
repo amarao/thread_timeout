@@ -1,0 +1,7 @@
+.eggs/*
+__pycache__/*
+build/*
+debian/python-thread-timeout.*
+debian/python-thread-timeout/*
+thread_timeout.egg-info/*
+*.pyc
