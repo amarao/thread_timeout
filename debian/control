@@ -2,7 +2,7 @@ Source: thread-timeout
 Maintainer: George Shuklin <george.shuklin@gmail.com>
 Section: python
 Priority: optional
-Build-Depends: python-setuptools (>= 0.6b3), python-all (>= 2.6.6-3), debhelper (>= 7), python-nose, python-pytest
+Build-Depends: python-setuptools (>= 0.6b3), python-all (>= 2.6.6-3), debhelper (>= 7), python-nose, python-pytest, python-wrapt
 X-Python-Version: >= 2.7
 Standards-Version: 3.9.1
 
