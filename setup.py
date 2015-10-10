@@ -7,11 +7,8 @@ class PyTest(Command):
     def finalize_options(self):
         pass
     def run(self):
-        print "foo"
-        import subprocess
         import pytest
         pytest.main('run_test.py')
-#        subprocess.check_call(['py.test'])
 
 setup(name='thread_timeout',
       version='1.0',
