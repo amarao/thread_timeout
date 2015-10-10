@@ -1,0 +1,5 @@
+thread-timeout (1.0-1) unstable; urgency=low
+
+  * Initial debianization
+
+ -- George Shuklin <george.shuklin@gmail.com>  Fri, 09 Oct 2015 18:04:45 +0300

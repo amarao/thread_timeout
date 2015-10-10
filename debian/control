@@ -1,0 +1,17 @@
+Source: thread-timeout
+Maintainer: George Shuklin <george.shuklin@gmail.com>
+Section: python
+Priority: optional
+Build-Depends: python-setuptools (>= 0.6b3), python-all (>= 2.6.6-3), debhelper (>= 7), python-nose, python-pytest
+X-Python-Version: >= 2.7
+Standards-Version: 3.9.1
+
+Package: python-thread-timeout
+Architecture: all
+Depends: ${misc:Depends}, ${python:Depends}
+Description: Run function in separate thread with timeout
+    Library to run seamlessly any python function in separate thread.
+    Allows to recieve timeout exception in main thread regardless of
+    the 'function thread' state, including TASK_UNINTERRUPTIBLE state
+    due to broken filesystem, kernel bug of knocked out NFS-server.
+
