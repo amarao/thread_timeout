@@ -107,6 +107,11 @@ class FailedKillExecTimeout(ExecTimeout):
 class NotKillExecTimeout(ExecTimeout):
     pass
 
+class ReturnValue:
+    type = None
+    value = None
+    exception = None
+    
 
 def thread_timeout(delay, kill=True, kill_wait=0.04):
     @wrapt.decorator
@@ -116,10 +121,16 @@ def thread_timeout(delay, kill=True, kill_wait=0.04):
         def inner_worker():
             try:
                 result = wrapped(*args, **kwargs)
-                queue.put(('success', result))
+                ret_value = ReturnValue()
+                ret_value.type = 'success'
+                ret_value.value = result
+                queue.put(ret_value)
             except:
                 e = sys.exc_info()
-                queue.put(('exception', e))
+                ret_value = ReturnValue()
+                ret_value.type = 'exception'
+                ret_value.exception = e
+                queue.put(ret_value)
         thread = threading.Thread(target=inner_worker)
         thread.daemon = True
         thread.start()
@@ -139,10 +150,10 @@ def thread_timeout(delay, kill=True, kill_wait=0.04):
                 raise KilledExecTimeout(
                     "Timeout and thread was killed")
         res = queue.get()
-        if res[0] == 'success':
-            return res[1]
-        if res[0] == 'exception':
-            raise res[1][0], res[1][1], res[1][2]
+        if res.type == 'success':
+            return res.value
+        if res.type == 'exception':
+            raise res.exception[0], res.exception[1], res.exception[2]
     return wrapper
 
 def continue_in_fork():
@@ -172,6 +183,8 @@ def continue_in_fork():
     PARENT_PID = os.getpid()
     libc = ctypes.CDLL("libc.so.6")
     pid = libc.fork()
+    if pid == -1:
+        raise RuntimeError("Unable to fork")
     if pid == 0:  # CHILD
         atexit.register(terminate_parent)
         return   # continue to run app in a new process
