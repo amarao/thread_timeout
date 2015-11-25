@@ -21,6 +21,9 @@ import sys
 import ctypes
 import wrapt  # pip install wrapt, apt-get install python-wrapt
 from Queue import Queue
+import signal
+import os
+import atexit
 '''
     thread_timeout decorator allows to run piece of the python code
     safely regardless of TASK_UNINTERRUPTIBLE issues ('D' state).
@@ -141,3 +144,43 @@ def thread_timeout(delay, kill=True, kill_wait=0.04):
         if res[0] == 'exception':
             raise res[1][0], res[1][1], res[1][2]
     return wrapper
+
+def continue_in_fork():
+    '''
+        Run rest of application as separate process
+        current process goes to endless sleep and passes
+        all (possible) signals back to child.
+        (child PID stored in CHILD_PID variable in the module)
+        Obviously terminates itself on SIGKILL.
+
+        child register an exit handler to terminate parent.
+
+        To avoid complications, it uses clib's fork function via ctypes.
+    '''
+    CHILD_PID = 0
+    PARENT_PID = 0
+    def all_signals_handler(sign, frame):
+        if CHILD_PID:
+            os.kill(CHILD_PID, sign)
+        if sign == signal.SIGTERM:
+            raise SystemExit
+
+    def terminate_parent():
+        if PARENT_PID:
+            os.kill(PARENT_PID, signal.SIGTERM)
+
+    PARENT_PID = os.getpid()
+    libc = ctypes.CDLL("libc.so.6")
+    pid = libc.fork()
+    if pid == 0:  # CHILD
+        atexit.register(terminate_parent)
+        return   # continue to run app in a new process
+    else:  # PARENT THREAD
+        CHILD_PID = pid
+        uncatchable = ['SIG_DFL','SIGSTOP','SIGKILL']
+        for i in [x for x in dir(signal) if x.startswith("SIG")]:
+            if not i in uncatchable:
+                signum = getattr(signal,i)
+                signal.signal(signum,all_signals_handler)
+        while True:
+            time.sleep(31536000)  # 1 year
