@@ -11,7 +11,7 @@ class PyTest(Command):
         pytest.main('run_test.py')
 
 setup(name='thread_timeout',
-      version='1.0',
+      version='1.1',
       description='''Decorator to execute functionin in
         separate thread with timeout''',
       author='George Shuklin',
