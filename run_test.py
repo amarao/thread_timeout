@@ -194,8 +194,7 @@ def test11():
 
 
 def test12():
-    '''Check if decorator waits before kill
-    '''
+    '''Check if decorator waits before kill'''
     @thread_timeout(3)
     def outer():
         @thread_timeout(3)
@@ -208,6 +207,15 @@ def test12():
     outer()
     assert 1 < time.time() - begin < 3
 
+def test13():
+    '''check if we can instance methods with one kwarg (real bug case)'''
+    class Foo:
+        @thread_timeout(1)
+        def bar(self, arg=1):
+            pass
+
+    foo = Foo()
+    foo.bar(arg=0)
 
 if __name__ == "__main__":
     print("Running tests")
