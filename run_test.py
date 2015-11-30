@@ -1,59 +1,46 @@
 #!/usr/bin/python
 
-from thread_timeout import *
+import pytest
 import time
-from nose import run
+from thread_timeout import *
 
-def test1():
+def test_no_timeout():
     ''' timeout is not stopping quick function
     '''
     @thread_timeout(2)
     def func(delay):
         time.sleep(delay)
 
-    func(1)
+    func(0.5)
 
 
-def test2():
-    ''' ExecTimeout
-    '''
+def test_raises():
+    'ExecTimeout is raised'
     @thread_timeout(1)
     def func(delay):
         time.sleep(delay)
 
-    try:
+    with pytest.raises(ExecTimeout):
         func(3)
-        raise Exception("Test2 failed: timeout does not work")
-    except ExecTimeout as e:
-        pass
 
-
-def test3():
-    ''' function returns result
-    '''
+def test_function_return():
+    'function returns result'
     @thread_timeout(1)
     def func(x):
         return x
 
-    assert func('OK') == 'OK'
+    assert( func('OK') == 'OK')
 
 
-def test4():
-    ''' FailedKillExecTimeout
-    '''
+def test_FailedKillExecTimeout():
     @thread_timeout(1)
     def looong():
         time.sleep(3)
-    try:
+    with pytest.raises(FailedKillExecTimeout):
         looong()
-        raise Exception('FailedKillExecTimeout was expected')
-    except FailedKillExecTimeout:
-        pass
 
 
-def test5():
-    ''' NotKillExecTimeout
-    '''
+def test_NotKillExecTimeout():
     @thread_timeout(1, kill=False)
     def looong_and_unkillable():
             time.sleep(2)
@@ -64,9 +51,7 @@ def test5():
         print("Test5 OK, got expected exception %s" % repr(e))
 
 
-def test6():
-    '''KilledExecTimeout
-    '''
+def test_KilledExecTimeout():
     @thread_timeout(1, kill_wait=0.40)
     def killme():
         for a in range(0, 200):
@@ -79,7 +64,7 @@ def test6():
         pass
 
 
-def test7():
+def test_decorator_return():
     ''' decorator is not changing python's into inspection
     '''
     from inspect import getargspec
@@ -91,9 +76,7 @@ def test7():
     assert getargspec(func) == getargspec(func_with_timeout)
 
 
-def test8():
-    ''' Class methods
-    '''
+def test_class_methods_are_ok():
     class Class(object):
 
         @thread_timeout(1)
@@ -115,9 +98,7 @@ def test8():
         pass
 
 
-def test9():
-    '''Check if exceptions are carried properly
-    '''
+def test_exceptions():
     @thread_timeout(1, kill=False)
     def exception(e):
         raise e
@@ -155,9 +136,7 @@ def test9():
             pass
 
 
-def test10():
-    '''Check if decorator stacking works (inner first)
-    '''
+def test_decorator_stacking_inner():
     @thread_timeout(2)
     def outer():
         @thread_timeout(1)
@@ -174,9 +153,7 @@ def test10():
     assert 1 < time.time() - begin < 2
 
 
-def test11():
-    '''Check if decorator stacking works (outer first)
-    '''
+def test_decorator_stacking_outer():
     @thread_timeout(1)
     def outer():
         @thread_timeout(2)
@@ -193,7 +170,7 @@ def test11():
     assert 1 < time.time() - begin < 2
 
 
-def test12():
+def test_waits():
     '''Check if decorator waits before kill'''
     @thread_timeout(3)
     def outer():
@@ -207,7 +184,7 @@ def test12():
     outer()
     assert 1 < time.time() - begin < 3
 
-def test13():
+def test_kwarg():
     '''check if we can instance methods with one kwarg (real bug case)'''
     class Foo:
         @thread_timeout(1)
