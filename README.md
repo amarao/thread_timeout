@@ -1,12 +1,11 @@
 Library to safely execute code without fear of the TASK\_UNINTERRUPTIBLE state
 -----------------------------------------------------------------------------
-thread\_timeout allows to run piece of the python code safely regardless 
+thread\_timeout allows to run given piece of python code safely regardless 
 of TASK\_UNINTERRUPTIBLE issues.
 
-It provides single decorator, adding a timeout for the function call.
+It provides a single decorator with a timeout for a function call.
 
-
-Example of the usage:
+Example:
 
     import thread_timeout
 
@@ -20,9 +19,11 @@ Example of the usage:
         print ("NFS seems to be hung")
 
 
-thread\_timeout works by running specified function in separate thread and waiting
-for timeout (or finalization) of the thread to return value or raise Exception.
-If thread is not finished before timeout, thread\_timeout may try to terminate
+thread\_timeout works by running specified function in a separate thread and waiting
+for timeout (or termination) of the thread. It returns to functions return value
+or reraise exception.
+
+If thread does not finish before timeout, thread\_timeout may try to terminate
 thread according to kill\_wait value (see below).
 
 thread\_timeout(timeout, kill=True, kill\_wait=0.1)
@@ -33,7 +34,8 @@ kill\_wait - how long to wait after killing before reporting an unresponsive thr
 
 THREAD KILLING
 
-Thread killing implemented on python level: it will terminate python code, but will not terminate any IO operations or subprocess calls.
+Thread killing implemented on python level: it will terminate python code, but will not terminate
+any IO operations or subprocess calls.
 
 Exceptions:
 
